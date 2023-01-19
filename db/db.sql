@@ -1,59 +1,166 @@
+---------------- Types
 CREATE EXTENSION IF NOT EXISTS citext;
 
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS forums CASCADE;
 DROP TABLE IF EXISTS threads CASCADE;
-DROP TABLE IF EXISTS votes CASCADE;
 DROP TABLE IF EXISTS posts CASCADE;
-DROP TABLE IF EXISTS forum_users CASCADE;
+DROP TABLE IF EXISTS votes CASCADE;
+DROP TABLE IF EXISTS forums_to_users CASCADE;
 
-CREATE TABLE IF NOT EXISTS users (
+---------------- Tables
+CREATE UNLOGGED TABLE IF NOT EXISTS Users (
     nickname CITEXT PRIMARY KEY,
-    fullname VARCHAR(128) NOT NULL,
-    about TEXT,
-    email CITEXT NOT NULL UNIQUE
+    name     TEXT NOT NULL,
+    email    CITEXT UNIQUE,
+    about    TEXT
 );
 
-CREATE TABLE IF NOT EXISTS forums (
-    title VARCHAR(128) NOT NULL,
-    user_nickname CITEXT NOT NULL REFERENCES users(nickname),
-    slug CITEXT PRIMARY KEY,
-    posts INT DEFAULT 0,
-    threads INT DEFAULT 0
+CREATE UNLOGGED TABLE IF NOT EXISTS Forums (
+    slug    CITEXT PRIMARY KEY,
+    title   TEXT NOT NULL,
+    author  CITEXT NOT null,
+    threads INT DEFAULT 0,
+    posts   BIGINT DEFAULT 0,
+
+    FOREIGN KEY (author) REFERENCES Users (nickname)
 );
 
-CREATE TABLE IF NOT EXISTS threads (
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(128) NOT NULL,
-    author CITEXT NOT NULL REFERENCES users(nickname),
-    forum CITEXT NOT NULL REFERENCES forums(slug) ON DELETE CASCADE,
+CREATE UNLOGGED TABLE IF NOT EXISTS Threads (
+    id      SERIAL PRIMARY KEY,
+    forum   CITEXT NOT NULL,
+    author  CITEXT NOT NULL,
+    created TIMESTAMP with time zone DEFAULT now(),
     message TEXT NOT NULL,
-    votes INT DEFAULT 0,
-    slug CITEXT UNIQUE,
-    created TIMESTAMP
+    title   TEXT NOT NULL,
+    votes   INT DEFAULT 0,
+    slug    CITEXT UNIQUE,
+
+    FOREIGN KEY (author) REFERENCES Users (nickname),
+    FOREIGN KEY (forum) REFERENCES Forums (slug)
 );
 
-CREATE TABLE IF NOT EXISTS forum_user (
-    user_nickname CITEXT NOT NULL REFERENCES users(nickname) ON DELETE CASCADE,
-    forum CITEXT NOT NULL REFERENCES forums(slug) ON DELETE CASCADE,
-    PRIMARY KEY (user_nickname, forum)
-);
-
-CREATE TABLE IF NOT EXISTS posts (
-    id SERIAL PRIMARY KEY,
-    parent INT,
-    author CITEXT NOT NULL REFERENCES users(nickname),
+CREATE UNLOGGED TABLE IF NOT EXISTS Posts (
+    id      BIGSERIAL PRIMARY KEY,
+    author  CITEXT NOT NULL,
+    created TIMESTAMP with time zone DEFAULT NOW(),
+    forum   CITEXT NOT NULL,
+    thread  INT,
+    edited  BOOLEAN DEFAULT FALSE,
     message TEXT NOT NULL,
-    is_edited BOOLEAN NOT NULL,
-    forum CITEXT REFERENCES forums(slug) ON DELETE CASCADE,
-    thread INT REFERENCES threads(id) ON DELETE CASCADE,
-    created TIMESTAMP,
-    post_tree INT[]
+    parent  BIGINT DEFAULT 0,
+    paths   BIGINT[] DEFAULT ARRAY []::BIGINT[], --информация о дереве "над" постом
+
+    FOREIGN KEY (author) REFERENCES Users (nickname),
+    FOREIGN KEY (forum) REFERENCES Forums (slug),
+    FOREIGN KEY (thread) REFERENCES Threads (id)
 );
 
-CREATE TABLE IF NOT EXISTS votes (
-    thread_id INT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-    nickname CITEXT NOT NULL REFERENCES users(nickname),
-    voice INT NOT NULL,
-    PRIMARY KEY (thread_id, nickname)
+CREATE UNLOGGED TABLE IF NOT EXISTS Votes (
+    nickname CITEXT,
+    result   BOOLEAN,
+    thread   INT,
+
+    FOREIGN KEY (nickname) REFERENCES Users (nickname),
+    FOREIGN KEY (thread) REFERENCES Threads (id),
+    UNIQUE(nickname, thread)
 );
+
+CREATE UNLOGGED TABLE IF NOT EXISTS forums_to_users (
+    slug     CITEXT NOT NULL,
+    nickname CITEXT NOT NULL,
+    name     TEXT NOT NULL,
+    about    TEXT,
+    email    CITEXT,
+    FOREIGN KEY (nickname) REFERENCES users (nickname),
+    FOREIGN KEY (slug) REFERENCES forums (slug),
+    UNIQUE (nickname, slug)
+);
+
+---------------- Trigger Procedures
+CREATE OR REPLACE FUNCTION update_paths_in_post() RETURNS TRIGGER AS $$
+DECLARE
+    parent_thread   INT;
+BEGIN
+    -- Check thread of parent post
+    IF (NEW.parent <> 0) THEN
+        SELECT thread FROM Posts WHERE id = NEW.parent INTO parent_thread;
+        IF (NOT FOUND) OR parent_thread <> NEW.thread THEN
+            RAISE EXCEPTION 'Parent post in another thread' USING ERRCODE = '00228';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trig_before_insert_posts ON posts;
+CREATE TRIGGER trig_before_insert_posts
+    BEFORE INSERT ON posts
+    FOR EACH ROW
+    EXECUTE PROCEDURE update_paths_in_post();
+
+---------------
+CREATE OR REPLACE FUNCTION update_post_paths_and_forumsToUsers() RETURNS TRIGGER AS $$
+DECLARE
+    parent_paths    BIGINT[];
+BEGIN
+    -- Update paths in `Posts`
+    IF (NEW.parent = 0) THEN
+        NEW.paths := array_append(NEW.paths, NEW.id);
+    ELSE
+        SELECT paths FROM Posts WHERE id = NEW.parent INTO parent_paths;
+        NEW.paths := array_append(parent_paths, NEW.id);
+    END IF;
+
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trig_after_insert_posts ON posts;
+CREATE TRIGGER trig_after_insert_posts
+    BEFORE INSERT ON posts
+    FOR EACH ROW
+EXECUTE PROCEDURE update_post_paths_and_forumsToUsers();
+
+----------------
+CREATE OR REPLACE FUNCTION update_threads_count_in_forum_and_forumsToUsers() RETURNS TRIGGER AS $$
+BEGIN
+    -- Update forums_to_users
+    INSERT INTO forums_to_users (slug, nickname, name, about, email)
+        SELECT NEW.forum, nickname, name, about, email
+        FROM Users
+        WHERE nickname = NEW.author
+    ON CONFLICT DO NOTHING;
+
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trig_before_insert_threads ON threads;
+CREATE TRIGGER trig_before_insert_threads
+    BEFORE INSERT ON threads
+    FOR EACH ROW
+EXECUTE PROCEDURE update_threads_count_in_forum_and_forumsToUsers();
+
+---------------- Indexes
+CREATE INDEX IF NOT EXISTS post_path1_paths_index ON posts ((paths[1]), paths);
+CREATE INDEX IF NOT EXISTS post_id_index ON posts (id);
+CREATE INDEX IF NOT EXISTS post_thread_parent_id_index ON posts (thread, parent, id);
+CREATE INDEX IF NOT EXISTS post_thread_path1_parent_id_index ON posts (thread, (paths[1]), parent, id);
+CREATE INDEX IF NOT EXISTS post_thread_paths_index ON posts (thread, paths);
+CREATE INDEX IF NOT EXISTS post_thread_id_created_index ON posts (thread, id, created);
+
+CREATE INDEX IF NOT EXISTS forum_slug_index ON forums (LOWER(slug));
+
+CREATE INDEX IF NOT EXISTS users_email_index ON users (LOWER(email));
+CREATE INDEX IF NOT EXISTS users_nickname_index ON users (nickname);
+
+CREATE UNIQUE INDEX IF NOT EXISTS forum_to_users_unique_index ON forums_to_users (LOWER(slug), nickname);
+CLUSTER forums_to_users USING forum_to_users_unique_index;
+
+CREATE INDEX IF NOT EXISTS thread_id_index ON threads (id);
+CREATE INDEX IF NOT EXISTS thread_slug_index ON threads (LOWER(slug));
+CREATE INDEX IF NOT EXISTS thread_forum_created_index ON threads (LOWER(forum), created);
+
+CREATE INDEX IF NOT EXISTS vote_nickname_thread_index ON votes (nickname, thread);
