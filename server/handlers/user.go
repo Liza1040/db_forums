@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	. "db-forums/models"
-	. "db-forums/server/db_requests"
+	. "DB_forums/models"
+	. "DB_forums/server/DB-requests"
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -33,7 +33,7 @@ func UserCreate(response http.ResponseWriter, request *http.Request) {
 		}
 		if len(usersExisting) == 0 {
 			response.WriteHeader(http.StatusNotFound)
-			response.Write(toMessage("Invalid db request. Error: " + err.Error()))
+			response.Write(toMessage("Invalid DB request. Error: " + err.Error()))
 			return
 		} // пользователя такого и нет, значит ошибка в запросе в БД
 

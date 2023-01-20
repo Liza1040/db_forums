@@ -13,12 +13,12 @@ Docker-контейнер организован по следующему пр�
 ## Как собрать и запустить контейнер
 Для сборки контейнера можно выполнить команду вида:
 ```bash
-docker build -t liza https://github.com/Liza1040/db_forums.git
+docker build -t liza https://github.com/Liza1040/DB_forums.git
 ```
 Или команды:
 ```bash
-git clone https://github.com/Liza1040/db_forums.git db-forums
-cd db-forums/
+git clone https://github.com/Liza1040/DB_forums.git DB_forums
+cd DB_forums/
 docker build -t liza .
 ```
 

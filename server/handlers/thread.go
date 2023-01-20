@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	. "db-forums/models"
-	. "db-forums/server/db_requests"
+	. "DB_forums/models"
+	. "DB_forums/server/DB-requests"
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
@@ -68,7 +68,7 @@ func PostsCreate(response http.ResponseWriter, request *http.Request) {
 	_, err = AddForumPosts_slug(thread.Forum, postsLen)
 	if err != nil {
 		response.WriteHeader(http.StatusNotFound)
-		response.Write(toMessage("Invalid db request. Error: " + err.Error()))
+		response.Write(toMessage("Invalid DB request. Error: " + err.Error()))
 		return
 	} // ошибка в запросе в БД
 
@@ -265,7 +265,7 @@ func VoteCreate(response http.ResponseWriter, request *http.Request) {
 			insertedVote, err = UPDATEVote_nickname_thread(vote.Nickname, id, vote.Result)
 			if err != nil {
 				response.WriteHeader(http.StatusNotFound)
-				response.Write(toMessage("Invalid db request. Error: " + err.Error()))
+				response.Write(toMessage("Invalid DB request. Error: " + err.Error()))
 				return
 			}
 		} else {
@@ -278,7 +278,7 @@ func VoteCreate(response http.ResponseWriter, request *http.Request) {
 		thread, err = UPDATEThreadVotes_id(id, totalResult)
 		if err != nil {
 			response.WriteHeader(http.StatusNotFound)
-			response.Write(toMessage("Invalid db request. Error: " + err.Error()))
+			response.Write(toMessage("Invalid DB request. Error: " + err.Error()))
 			return
 		} // ошибка в запросе в БД
 	}

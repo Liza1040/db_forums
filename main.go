@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"db-forums/models"
-	"db-forums/server/handlers"
+	"DB_forums/models"
+	"DB_forums/server/handlers"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
@@ -31,7 +31,7 @@ func middlewareFunc(_ *mux.Router) mux.MiddlewareFunc {
 func main() {
 	prometheus.MustRegister(requestsTotal)
 
-	parsedConnection, err := pgx.ParseConnectionString("host=localhost user=postgres password=root dbname=db-forums sslmode=disable")
+	parsedConnection, err := pgx.ParseConnectionString("host=localhost user=postgres password=root dbname=DB_forums sslmode=disable")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -46,15 +46,15 @@ func main() {
 		AcquireTimeout: 0,
 	}
 
-	models.db, err = pgx.NewConnPool(connectionConfig)
+	models.DB, err = pgx.NewConnPool(connectionConfig)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
 	/*---------TEST--------
-	handlers.TestDropdb()
-	handlers.TestInitdb()
+	handlers.TestDropDB()
+	handlers.TestInitDB()
 	//---------TEST--------*/
 
 	router := mux.NewRouter()
@@ -70,10 +70,10 @@ func main() {
 
 	router.HandleFunc("/api/post/{id:[0-9]+}/details", handlers.PostDetails).Methods(http.MethodGet, http.MethodPost)
 
-	//router.HandleFunc("/api/service/init", handlers.Initdb)
-	//router.HandleFunc("/api/service/drop", handlers.Dropdb)
-	router.HandleFunc("/api/service/clear", handlers.Cleardb).Methods(http.MethodPost)
-	router.HandleFunc("/api/service/status", handlers.Statusdb).Methods(http.MethodGet)
+	//router.HandleFunc("/api/service/init", handlers.InitDB)
+	//router.HandleFunc("/api/service/drop", handlers.DropDB)
+	router.HandleFunc("/api/service/clear", handlers.ClearDB).Methods(http.MethodPost)
+	router.HandleFunc("/api/service/status", handlers.StatusDB).Methods(http.MethodGet)
 
 	router.HandleFunc("/api/thread/{slug_or_id}/create", handlers.PostsCreate).Methods(http.MethodPost)
 	router.HandleFunc("/api/thread/{slug_or_id}/details", handlers.ThreadDetails).Methods(http.MethodGet, http.MethodPost)

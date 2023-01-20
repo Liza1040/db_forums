@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	. "db-forums/models"
-	. "db-forums/server/db_requests"
+	. "DB_forums/models"
+	. "DB_forums/server/DB-requests"
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -159,7 +159,7 @@ func ForumUsers(response http.ResponseWriter, request *http.Request) {
 	users, err := SELECTForumUsers(slug, limit, since, desc)
 	if err != nil {
 		response.WriteHeader(http.StatusNotFound)
-		response.Write(toMessage("Invalid db request: " + err.Error()))
+		response.Write(toMessage("Invalid DB request: " + err.Error()))
 		return
 	}
 
@@ -207,7 +207,7 @@ func ForumThreads(response http.ResponseWriter, request *http.Request) {
 	structs, err := SELECTForumThreads(slug, limit, since, desc)
 	if err != nil {
 		response.WriteHeader(http.StatusNotFound)
-		response.Write(toMessage("Invalid db request. Error: " + err.Error()))
+		response.Write(toMessage("Invalid DB request. Error: " + err.Error()))
 		return
 	} // ошибка в запросе в БД
 

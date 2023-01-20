@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var db *pgx.ConnPool
+var DB *pgx.ConnPool
 
 type User struct {
 	Nickname string `json:"nickname"`

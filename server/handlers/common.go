@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"db-forums/models"
+	"DB_forums/models"
 	"encoding/json"
 )
 

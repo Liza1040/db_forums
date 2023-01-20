@@ -24,7 +24,7 @@ USER postgres
 # then create a database `forums` owned by the ``docker`` role.
 RUN /etc/init.d/postgresql start &&\
     psql --command "ALTER USER postgres WITH PASSWORD 'root';" &&\
-    createdb -O postgres db-forums &&\
+    createdb -O postgres DB_forums &&\
     /etc/init.d/postgresql stop
 
 # Expose the PostgreSQL port
@@ -44,4 +44,4 @@ COPY --from=builder /app /app
 
 EXPOSE 5000
 ENV PGPASSWORD root
-CMD service postgresql start && psql -h localhost -d db-forums -U postgres -p 5432 -a -q -f /app/db/db.sql && /app/main
+CMD service postgresql start && psql -h localhost -d DB_forums -U postgres -p 5432 -a -q -f /app/db/db.sql && /app/main
