@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"DB_forums/models"
@@ -26,6 +27,18 @@ func middlewareFunc(_ *mux.Router) mux.MiddlewareFunc {
 			handler.ServeHTTP(response, request)
 		})
 	}
+}
+
+var hitsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+	Name: "hits_counter",
+	Help: "Number of hits to the server",
+})
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+		hitsCounter.Inc()
+	})
 }
 
 func main() {
@@ -58,10 +71,12 @@ func main() {
 	//---------TEST--------*/
 
 	router := mux.NewRouter()
-
+	prometheus.MustRegister(hitsCounter)
+	router.Use(loggingMiddleware)
+	router.Path("/metrics").Handler(promhttp.Handler())
 	router.Use(middlewareFunc(router))
 
-	router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
+	// router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
 	router.HandleFunc("/api/forum/create", handlers.ForumCreate).Methods(http.MethodPost)
 	router.HandleFunc("/api/forum/{slug}/details", handlers.ForumDetails).Methods(http.MethodGet)
 	router.HandleFunc("/api/forum/{slug}/create", handlers.ThreadCreate).Methods(http.MethodPost)
